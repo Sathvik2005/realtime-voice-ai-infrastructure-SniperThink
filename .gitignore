@@ -1,0 +1,39 @@
+# ── Secrets ───────────────────────────────────────────────────────────
+.env
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── ML models (large binary files) ──────────────────────────────────
+*.onnx
+*.onnx.json
+*.pt
+*.bin
+*.safetensors
+piper/
+backend/models/
+
+# ── RAG / vector store ────────────────────────────────────────────────
+*.faiss
+*.index
+rag/knowledge_base/
+
+# ── OS / editor ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# ── Logs ─────────────────────────────────────────────────────────────
+*.log
+logs/

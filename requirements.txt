@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Voice AI System — Python dependencies
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+websockets>=12.0
+
+# ── WebRTC ────────────────────────────────────────────────────────────────────
+aiortc>=1.9.0
+aioice>=0.9.0
+
+# ── Voice Activity Detection ──────────────────────────────────────────────────
+torch>=2.2.0
+torchaudio>=2.2.0
+# silero-vad is loaded via torch.hub (no pip package required)
+
+# ── Speech Recognition ────────────────────────────────────────────────────────
+faster-whisper>=1.0.0
+
+# ── Language Model ────────────────────────────────────────────────────────────
+openai>=1.30.0
+
+# ── Text-to-Speech (fallback) ─────────────────────────────────────────────────
+gTTS>=2.5.0
+# piper-tts: install the binary separately (see README)
+
+# ── Audio processing ─────────────────────────────────────────────────────────
+numpy>=1.26.0
+av>=12.0.0           # PyAV — used by aiortc for audio decoding
+
+# ── RAG (optional) ────────────────────────────────────────────────────────────
+faiss-cpu>=1.8.0
+sentence-transformers>=3.0.0
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
