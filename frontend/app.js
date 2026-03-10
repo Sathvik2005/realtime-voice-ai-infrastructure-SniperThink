@@ -219,7 +219,7 @@ function appendToken(token) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-function finaliseAI(fullText) {
+function finaliseAI(fullText, provider) {
   // Finish or create the bubble
   if (aiTurnEl) {
     aiTurnEl.classList.remove("streaming");
@@ -229,6 +229,18 @@ function finaliseAI(fullText) {
     aiTurnEl = aiMsgEl.querySelector(".bubble");
     aiTurnEl.classList.remove("streaming");
     aiTurnEl.textContent = fullText;
+  }
+
+  // Show which provider answered (helpful for debugging fallback)
+  if (provider && aiMsgEl) {
+    const meta = aiMsgEl.querySelector(".msg-meta");
+    if (meta && provider !== "OpenAI") {
+      const badge = document.createElement("span");
+      badge.className = "provider-badge";
+      badge.title = "LLM provider used for this response";
+      badge.textContent = provider;
+      meta.appendChild(badge);
+    }
   }
 
   // Add Copy + Replay action buttons
@@ -313,7 +325,7 @@ function handleMsg(msg) {
       break;
 
     case "llm_response":
-      finaliseAI(msg.text);
+      finaliseAI(msg.text, msg.provider);
       speakText(msg.text);
       break;
 

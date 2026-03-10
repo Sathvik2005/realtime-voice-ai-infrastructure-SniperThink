@@ -3,6 +3,8 @@
 A **real-time, bidirectional voice conversation system** built from first principles.  
 The user speaks; the AI listens, reasons, and responds — all with sub-800 ms latency.
 
+The system is fully resilient: if OpenAI is unavailable or quota is exhausted, it falls back to a local Ollama model, and if that too is unavailable it falls back to a fast rule-based engine — so the system always responds.
+
 ---
 
 ## Architecture at a Glance
@@ -28,7 +30,10 @@ AudioWorklet (20 ms PCM frames)
   │                                      [RAG retrieval — optional]
   │                                        │  context
   │                                        ▼
-  │                                      LLM (OpenAI streaming)
+  │                                      LLM (fallback chain)
+  │                                        │  1. OpenAI API (cloud)
+  │                                        │  2. Ollama (local)
+  │                                        │  3. Rule-based (always works)
   │                                        │  token stream ──────────┐
   │                                        ▼                         │
   │                                      TTS (Piper streaming) ◄─────┘
@@ -46,7 +51,7 @@ Speakers
 - **Real-time WebRTC audio transport** — microphone audio travels over UDP with DTLS/SRTP encryption
 - **Streaming VAD** — Silero VAD detects speech boundaries at 32 ms resolution
 - **Streaming ASR** — Faster-Whisper with partial and final transcription modes
-- **Streaming LLM** — OpenAI chat completions with token-by-token output
+- **Streaming LLM with automatic fallback** — three-tier chain: OpenAI → Ollama (local) → Rule-based engine; the system always produces a response even without internet or API quota
 - **Sentence-pipeline TTS** — Piper TTS begins synthesising before the full response is available
 - **Interruption handling** — user speech cancels the current AI turn instantly
 - **Conversational memory** — full multi-turn history maintained per session
@@ -66,7 +71,7 @@ voice-ai-system/
 │   ├── audio_router.py          Pipeline orchestrator
 │   ├── vad.py                   Silero VAD wrapper
 │   ├── asr_streaming.py         Faster-Whisper wrapper
-│   ├── llm_engine.py            OpenAI streaming client
+│   ├── llm_engine.py            LLM fallback chain (OpenAI → Ollama → Rule-based)
 │   ├── tts_streaming.py         Piper TTS streaming wrapper
 │   └── interrupt_controller.py  asyncio task cancellation
 ├── frontend/
@@ -174,8 +179,10 @@ All configuration is via environment variables (`.env` file):
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | — | **Required** OpenAI API key |
-| `OPENAI_MODEL` | `gpt-4o-mini` | LLM model name |
+| `OPENAI_API_KEY` | — | OpenAI API key (optional — system works without it via fallback) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model name |
+| `OLLAMA_MODEL` | `llama3` | Ollama model name (used if OpenAI is unavailable) |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama server URL |
 | `WHISPER_MODEL_SIZE` | `base` | Whisper model: `tiny`, `base`, `small`, `medium` |
 | `WHISPER_DEVICE` | `cpu` | `cpu` or `cuda` |
 | `TTS_VOICE` | `en_US-lessac-medium` | Piper voice model name |
@@ -186,7 +193,36 @@ All configuration is via environment variables (`.env` file):
 
 ---
 
-## Latency Strategy
+## LLM Fallback Chain
+
+The system tries three providers in order and falls back automatically on any error:
+
+```
+1. OpenAI API          — cloud GPT-4o-mini (or any model)
+      │  400/401/429/timeout → fallback
+      ▼
+2. Ollama (local)      — llama3 (or any pulled model) at localhost:11434
+      │  connection refused / timeout → fallback
+      ▼
+3. Rule-based engine   — keyword regex, hardcoded replies, always responds
+```
+
+The active provider name is sent with every response (`msg.provider`) and displayed as a badge in the UI when OpenAI is **not** the provider (so normal users see nothing extra, but you can tell when a fallback is active).
+
+### Setting up Ollama (optional but recommended)
+
+```bash
+# Install Ollama — https://ollama.com
+# Then pull a model:
+ollama pull llama3        # ~4 GB one-time download
+# Ollama runs on http://localhost:11434 by default
+```
+
+Set `OLLAMA_MODEL` and `OLLAMA_URL` in your `.env` (see `.env.example`).
+
+---
+
+
 
 The system targets **< 800 ms end-to-end** response latency.
 
@@ -249,7 +285,7 @@ The focus is on **architecture correctness** over dataset quality.
 
 - **Single-server only** — session state is in-process; horizontal scaling requires Redis + sticky routing
 - **English only** — Whisper can transcribe other languages; change `language="en"` in `asr_streaming.py`
-- **OpenAI dependency** — swap `llm_engine.py` for an Ollama client to go fully local
+- **Fully offline capable** — Ollama + Piper + Whisper (with CUDA) means no internet connection is needed at all after initial model downloads
 - **Piper model download** — manual step; gTTS fallback works but adds network latency
 - **No TURN server** — WebRTC may fail through strict NAT; add Coturn for production
 

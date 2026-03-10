@@ -73,13 +73,16 @@ async def initialize_models() -> None:
     except Exception as exc:
         logger.warning(f"ASR not available (faster-whisper missing?): {exc}")
 
-    # 3. LLM — always attempt; needs only openai + OPENAI_API_KEY in env
+    # 3. LLM — initialise with three-provider fallback chain
+    #         OpenAI → Ollama → Rule-based
     try:
         _llm = LLMEngine(
             model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+            ollama_model=os.environ.get("OLLAMA_MODEL", "llama3"),
+            ollama_url=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
         )
         await _llm.initialize()
-        logger.info("LLM ready.")
+        logger.info(f"LLM ready. Active provider: {_llm.active_provider}")
     except Exception as exc:
         logger.error(f"LLM initialisation failed: {exc}")
 

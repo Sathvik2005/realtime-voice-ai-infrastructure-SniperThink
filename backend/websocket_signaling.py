@@ -117,14 +117,14 @@ class SignalingHandler:
         )
 
     async def _llm_respond(self, transcript: str) -> None:
-        """Run LLM and stream the text response back to the browser."""
+        """Run LLM (with automatic fallback chain) and stream text back to the browser."""
         from audio_router import _llm
         from llm_engine import LLMEngine
 
         if _llm is None:
             await self.websocket.send_json({
                 "type": "error",
-                "message": "LLM not ready. Add OPENAI_API_KEY to .env and restart.",
+                "message": "LLM not initialised. Check server logs and restart.",
             })
             self.session.transition(SessionState.IDLE)
             return
@@ -142,26 +142,25 @@ class SignalingHandler:
                 if self.session.interrupt_event.is_set():
                     break
                 full_response += token
-                # Stream tokens so UI can show partial text
                 await self.websocket.send_json({"type": "response_token", "token": token})
 
             await self.websocket.send_json({
                 "type": "llm_response",
                 "text": full_response,
+                "provider": _llm.active_provider,
             })
 
             self.session.conversation_history = LLMEngine.update_history(
                 self.session.conversation_history, transcript, full_response
             )
         except Exception as exc:
-            logger.error(f"[{self.session.session_id}] LLM error: {exc}")
-            # Surface the real error (e.g. quota exceeded, invalid key)
-            friendly = str(exc)
-            if "insufficient_quota" in friendly or "429" in friendly:
-                friendly = "OpenAI quota exceeded — add billing credits at platform.openai.com or use a different API key."
-            elif "invalid_api_key" in friendly or "401" in friendly:
-                friendly = "Invalid OpenAI API key — update OPENAI_API_KEY in your .env file and restart."
-            await self.websocket.send_json({"type": "error", "message": friendly})
+            # Should not reach here — the engine's fallback chain absorbs all errors.
+            # This is a last-resort safety net.
+            logger.error(f"[{self.session.session_id}] Unexpected LLM error: {exc}")
+            await self.websocket.send_json({
+                "type": "error",
+                "message": "An unexpected error occurred. Please try again.",
+            })
         finally:
             self.session.transition(SessionState.IDLE)
             await self.websocket.send_json({"type": "response_complete"})

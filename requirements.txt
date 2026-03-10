@@ -22,6 +22,7 @@ faster-whisper>=1.0.0
 
 # ── Language Model ────────────────────────────────────────────────────────────
 openai>=1.30.0
+httpx>=0.27.0          # Ollama provider — async HTTP client
 
 # ── Text-to-Speech (fallback) ─────────────────────────────────────────────────
 gTTS>=2.5.0
