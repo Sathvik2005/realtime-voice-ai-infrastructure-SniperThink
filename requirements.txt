@@ -24,6 +24,9 @@ faster-whisper>=1.0.0
 openai>=1.30.0
 httpx>=0.27.0          # Ollama provider — async HTTP client
 
+# ── Speech Recognition (HF Gradio mode) ───────────────────────
+gradio_client>=0.16.0  # ASR_MODE=hf — calls openai/whisper HF Space
+
 # ── Text-to-Speech (fallback) ─────────────────────────────────────────────────
 gTTS>=2.5.0
 # piper-tts: install the binary separately (see README)

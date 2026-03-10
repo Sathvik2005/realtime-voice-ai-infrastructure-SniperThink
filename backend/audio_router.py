@@ -34,7 +34,7 @@ from typing import Optional
 
 from session_manager import Session, SessionState
 from vad import VADEngine
-from asr_streaming import StreamingASR
+from asr_streaming import StreamingASR, HFWhisperASR, make_asr
 from llm_engine import LLMEngine
 from tts_streaming import StreamingTTS
 from interrupt_controller import InterruptController
@@ -46,11 +46,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _llm: Optional[LLMEngine] = None
 _tts: Optional[StreamingTTS] = None
+_asr_mode: str = "local"  # "local" | "hf"
 
 
 async def initialize_models() -> None:
     """Load / initialise all ML models.  Called from FastAPI lifespan."""
-    global _llm, _tts
+    global _llm, _tts, _asr_mode
+
+    _asr_mode = os.environ.get("ASR_MODE", "local").strip().lower()
 
     # 1. Silero VAD — requires torch; skip gracefully if unavailable
     try:
@@ -59,19 +62,33 @@ async def initialize_models() -> None:
     except Exception as exc:
         logger.warning(f"VAD not available (torch missing?): {exc}")
 
-    # 2. Faster-Whisper ASR — requires faster_whisper; skip gracefully
-    try:
-        whisper_size = os.environ.get("WHISPER_MODEL_SIZE", "base")
-        whisper_device = os.environ.get("WHISPER_DEVICE", "cpu")
-        compute_type = "int8" if whisper_device == "cpu" else "float16"
-        await StreamingASR.load_shared_model(
-            model_size=whisper_size,
-            device=whisper_device,
-            compute_type=compute_type,
-        )
-        logger.info(f"Whisper ASR loaded: {whisper_size} on {whisper_device}.")
-    except Exception as exc:
-        logger.warning(f"ASR not available (faster-whisper missing?): {exc}")
+    # 2. ASR — two modes: local (faster-whisper) or hf (Hugging Face Gradio Space)
+    if _asr_mode == "hf":
+        try:
+            hf_token = os.environ.get("HF_TOKEN") or None
+            hf_space = os.environ.get("HF_WHISPER_SPACE", "openai/whisper")
+            await HFWhisperASR.load_shared_client(
+                hf_token=hf_token,
+                space=hf_space,
+            )
+            logger.info(f"ASR mode: HF Gradio Whisper (space={hf_space})")
+        except Exception as exc:
+            logger.warning(f"HF Whisper client failed, falling back to local: {exc}")
+            _asr_mode = "local"
+
+    if _asr_mode == "local":
+        try:
+            whisper_size = os.environ.get("WHISPER_MODEL_SIZE", "base")
+            whisper_device = os.environ.get("WHISPER_DEVICE", "cpu")
+            compute_type = "int8" if whisper_device == "cpu" else "float16"
+            await StreamingASR.load_shared_model(
+                model_size=whisper_size,
+                device=whisper_device,
+                compute_type=compute_type,
+            )
+            logger.info(f"ASR mode: local Whisper ({whisper_size} on {whisper_device})")
+        except Exception as exc:
+            logger.warning(f"ASR not available (faster-whisper missing?): {exc}")
 
     # 3. LLM — initialise with three-provider fallback chain
     #         OpenAI → Ollama → Rule-based
@@ -108,7 +125,7 @@ class AudioRouter:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.vad = VADEngine()          # per-session VAD state machine
-        self.asr = StreamingASR()       # per-session audio buffer
+        self.asr = make_asr(_asr_mode)  # per-session audio buffer (local or hf)
         self.llm = _llm                 # shared, stateless (history passed in)
         self.tts = _tts                 # shared, stateless
 

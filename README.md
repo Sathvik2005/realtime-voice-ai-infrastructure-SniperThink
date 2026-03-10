@@ -70,7 +70,7 @@ voice-ai-system/
 │   ├── webrtc_server.py         aiortc peer connection management
 │   ├── audio_router.py          Pipeline orchestrator
 │   ├── vad.py                   Silero VAD wrapper
-│   ├── asr_streaming.py         Faster-Whisper wrapper
+│   ├── asr_streaming.py         ASR providers: local Faster-Whisper + HF Gradio Whisper
 │   ├── llm_engine.py            LLM fallback chain (OpenAI → Ollama → Rule-based)
 │   ├── tts_streaming.py         Piper TTS streaming wrapper
 │   └── interrupt_controller.py  asyncio task cancellation
@@ -183,13 +183,41 @@ All configuration is via environment variables (`.env` file):
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model name |
 | `OLLAMA_MODEL` | `llama3` | Ollama model name (used if OpenAI is unavailable) |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server URL |
-| `WHISPER_MODEL_SIZE` | `base` | Whisper model: `tiny`, `base`, `small`, `medium` |
+| `ASR_MODE` | `local` | `local` (Faster-Whisper) or `hf` (HF Gradio Whisper) |
+| `WHISPER_MODEL_SIZE` | `base` | Local Whisper model size: `tiny`, `base`, `small`, `medium` |
 | `WHISPER_DEVICE` | `cpu` | `cpu` or `cuda` |
+| `HF_WHISPER_SPACE` | `openai/whisper` | HF Space used when `ASR_MODE=hf` |
+| `HF_TOKEN` | — | HuggingFace token for private spaces or higher rate limits |
 | `TTS_VOICE` | `en_US-lessac-medium` | Piper voice model name |
 | `PIPER_PATH` | `piper` | Path to piper executable |
 | `PORT` | `8000` | HTTP/WebSocket port |
 | `RAG_ENABLED` | `false` | Enable RAG context retrieval |
 | `KNOWLEDGE_BASE_PATH` | `rag/knowledge_base` | Directory of .txt / .md files to ingest |
+
+---
+
+## ASR Modes
+
+Two speech recognition backends are available, controlled by `ASR_MODE`:
+
+| Mode | Value | How it works |
+|---|---|---|
+| **Local** (default) | `ASR_MODE=local` | Runs Faster-Whisper on your machine (CPU/GPU). No internet required after model download. |
+| **Hugging Face** | `ASR_MODE=hf` | Calls the [openai/whisper](https://huggingface.co/spaces/openai/whisper) Gradio Space over HTTPS. No local model needed — requires internet. |
+
+### Using HF Whisper mode
+
+```bash
+# 1. Install the client
+pip install gradio_client
+
+# 2. Set in .env
+ASR_MODE=hf
+HF_WHISPER_SPACE=openai/whisper   # default
+# HF_TOKEN=hf_...                 # optional, for private spaces or higher rate limits
+```
+
+The HF Space accepts WAV audio and returns a transcript in one round-trip. Because it is request/response (not streaming), `partial()` is a no-op — the live typing indicator is driven by the browser's `SpeechRecognition` API instead, which still works in parallel.
 
 ---
 
