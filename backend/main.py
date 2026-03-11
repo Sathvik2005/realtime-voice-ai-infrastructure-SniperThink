@@ -103,6 +103,18 @@ async def health_check():
     return {"status": "ok", "active_sessions": session_manager.active_count()}
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon to prevent 404 errors."""
+    favicon_path = FRONTEND_DIR / "favicon.ico"
+    if favicon_path.exists():
+        from fastapi.responses import FileResponse
+        return FileResponse(favicon_path)
+    # Return a 204 No Content instead of 404 if favicon doesn't exist
+    from fastapi.responses import Response
+    return Response(status_code=204)
+
+
 # ---------------------------------------------------------------------------
 # WebSocket endpoint  — one connection per voice session
 # ---------------------------------------------------------------------------
