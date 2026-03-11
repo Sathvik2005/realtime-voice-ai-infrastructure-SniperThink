@@ -38,35 +38,82 @@ MAX_TOKENS = 300
 # ---------------------------------------------------------------------------
 
 _RULES: List[tuple] = [
-    (r"\bhello\b|\bhi\b|\bhey\b",
-     "Hello! I'm your voice assistant. How can I help you today?"),
+    # Greetings
+    (r"\bhello\b|\bhi\b|\bhey\b|\bgreetings\b",
+     "Hello! I'm your voice assistant running in offline mode. How can I help you today?"),
+    
+    # Identity questions
     (r"\bwhat.*(your name|are you|who are you)\b",
-     "I'm a voice AI assistant built on a real-time streaming pipeline."),
-    (r"\bhow are you\b",
-     "I'm running well, thank you for asking! What can I do for you?"),
+     "I'm a voice AI assistant built on a real-time streaming pipeline. I'm currently running in offline mode."),
+    
+    # Status checks
+    (r"\bhow are you\b|\bare you (there|listening|working|ok)\b",
+     "I'm running well in offline mode! I can hear you and respond. What can I do for you?"),
+    
+    # Jokes
+    (r"\bjoke\b|\bfunny\b|\bmake me laugh\b",
+     "Here's one: Why did the AI go to therapy? Because it had too many issues to resolve! What else can I help with?"),
+    
+    # Capabilities
+    (r"\bwhat can you do\b|\byour capabilities\b|\bhelp\b",
+     "I'm in offline mode right now, so I can chat with you using pre-programmed responses. For more advanced features, you'd need to set up an AI provider."),
+    
+    # Listening confirmation
+    (r"\bcan you (hear|speak|talk|understand)\b|\blistening\b",
+     "Yes, I can hear you and speak! I'm running in offline mode with basic conversational abilities. Try asking me something!"),
+    
+    # Gratitude
     (r"\bthank(s| you)\b",
      "You're welcome! Is there anything else I can help with?"),
-    (r"\bbye\b|\bgoodbye\b|\bsee you\b",
-     "Goodbye! Have a great day."),
-    (r"\bweather\b",
-     "I don't have access to live weather data right now, but you can check a weather website for the latest forecast."),
-    (r"\btime\b|\bclock\b",
-     "I don't have access to a real-time clock in this mode, but your device should show the current time."),
-    (r"\bhelp\b|\bwhat can you do\b",
-     "I can answer questions and have a conversation with you. My AI backend may be in fallback mode right now, so complex questions might get simple answers."),
+    
+    # Apologies
     (r"\bsorry\b|\bapolog\b",
      "No worries at all! What would you like to talk about?"),
+    
+    # Farewells
+    (r"\bbye\b|\bgoodbye\b|\bsee you\b",
+     "Goodbye! Have a great day."),
+    
+    # Information requests
+    (r"\bweather\b",
+     "I don't have access to live weather data in offline mode, but you can check a weather website for the latest forecast."),
+    (r"\btime\b|\bclock\b",
+     "I don't have access to a real-time clock in this mode, but your device should show the current time."),
+    (r"\bnews\b",
+     "I can't access live news in offline mode, but you can check your favorite news website for updates."),
+    
+    # Testing
+    (r"\btest\b|\btesting\b",
+     "Test successful! I'm hearing you loud and clear in offline mode. Everything is working as expected."),
+    
+    # Music/Entertainment
+    (r"\bmusic\b|\bsong\b|\bplay\b",
+     "I can't play music directly, but I can chat with you about your favorite songs or artists!"),
+    
+    # Stories
+    (r"\bstory\b|\btell me about\b",
+     "I'd love to tell you a story! Once upon a time, there was a voice AI that worked even without internet. And that AI is me!"),
+    
+    # Math/calculations
+    (r"\bcalculat\b|\bmath\b|\bplus\b|\bminus\b|\btimes\b",
+     "I can handle simple concepts in offline mode, but for complex calculations, you might want to use a calculator app."),
+    
+    # General questions
+    (r"\bwhy\b|\bhow\b|\bwhat\b|\bwhen\b|\bwhere\b",
+     "That's an interesting question! In offline mode, I have limited knowledge, but I'm here to chat with you. Ask me something else!"),
 ]
 
 def _rule_based_response(text: str) -> str:
-    """Return a scripted reply if any keyword rule matches, else a generic reply."""
+    """Return a scripted reply if any keyword rule matches, else a friendly default."""
     lower = text.lower()
     for pattern, reply in _RULES:
         if re.search(pattern, lower):
             return reply
+    
+    # Default response for anything not matched - always friendly and helpful
     return (
-        "I heard you, but my AI backend is temporarily unavailable. "
-        "Please try again in a moment, or check that your API key or Ollama service is configured."
+        "I heard you! I'm running in offline mode right now, so my responses are basic. "
+        "But I'm here and listening. Try asking me something simple, or just chat with me!"
     )
 
 
