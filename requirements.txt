@@ -22,6 +22,7 @@ faster-whisper>=1.0.0
 
 # ── Language Model ────────────────────────────────────────────────────────────
 openai>=1.30.0
+groq>=0.4.0            # Groq ultra-fast inference (free tier available)
 httpx>=0.27.0          # Ollama provider — async HTTP client
 
 # ── Speech Recognition (HF Gradio mode) ───────────────────────

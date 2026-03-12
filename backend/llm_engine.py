@@ -2,12 +2,13 @@
 LLM Engine  —  streaming responses with automatic fallback chain
 
 Fallback chain (tried in order, first that succeeds wins):
-  1. OpenAI API       — primary; best quality, cloud-hosted
-  2. Ollama local LLM — secondary; fully offline, runs on localhost:11434
-  3. Rule-based       — tertiary; always works, no dependencies whatsoever
+  1. Groq API         — ultra-fast inference, free tier available
+  2. OpenAI API       — high quality, cloud-hosted
+  3. Ollama local LLM — fully offline, runs on localhost:11434
+  4. Rule-based       — always works, no dependencies whatsoever
 
 This means the system remains fully usable even when:
-  • OPENAI_API_KEY is missing or quota is exhausted
+  • GROQ_API_KEY or OPENAI_API_KEY is missing or quota is exhausted
   • Ollama is not installed
   • There is no internet connectivity
 
@@ -168,6 +169,55 @@ class _OpenAIProvider:
 
 
 # ---------------------------------------------------------------------------
+# Provider: Groq  (ultra-fast cloud inference)
+# ---------------------------------------------------------------------------
+
+class _GroqProvider:
+    name = "Groq"
+
+    def __init__(self, model: str, api_key: str) -> None:
+        self.model = model
+        self._api_key = api_key
+        self._client = None
+
+    async def initialize(self) -> bool:
+        """Return True if the client can be instantiated."""
+        if not self._api_key:
+            logger.warning("Groq: no API key configured — skipping")
+            return False
+        try:
+            from groq import AsyncGroq
+            self._client = AsyncGroq(api_key=self._api_key)
+            logger.info(f"Groq provider ready: model={self.model}")
+            return True
+        except ImportError:
+            logger.warning("Groq: groq package not installed — skipping (pip install groq)")
+            return False
+
+    async def stream_tokens(
+        self,
+        messages: List[Dict],
+        interrupt_event: Optional[asyncio.Event],
+    ) -> AsyncGenerator[str, None]:
+        if self._client is None:
+            raise RuntimeError("Groq client not initialised")
+        stream = await self._client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            stream=True,
+            max_tokens=MAX_TOKENS,
+            temperature=0.7,
+        )
+        async for chunk in stream:
+            if interrupt_event and interrupt_event.is_set():
+                logger.info("Groq stream cancelled by interrupt")
+                return
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
+
+# ---------------------------------------------------------------------------
 # Provider: Ollama  (local LLM via REST)
 # ---------------------------------------------------------------------------
 
@@ -292,11 +342,14 @@ class LLMEngine:
         self,
         model: str = "gpt-4o-mini",
         api_key: Optional[str] = None,
+        groq_model: str = "llama-3.3-70b-versatile",
+        groq_api_key: Optional[str] = None,
         ollama_model: str = "llama3",
         ollama_url: str = "http://localhost:11434",
     ) -> None:
         self.model = model
         self._providers: list = [
+            _GroqProvider(groq_model, groq_api_key or os.environ.get("GROQ_API_KEY", "")),
             _OpenAIProvider(model, api_key or os.environ.get("OPENAI_API_KEY", "")),
             _OllamaProvider(ollama_model, ollama_url),
             _RuleBasedProvider(),
